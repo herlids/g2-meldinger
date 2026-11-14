@@ -1,0 +1,16 @@
+{
+  "package_id": "no.hermann.gtomeldinger",
+  "edition": "202601",
+  "name": "G2 Meldinger",
+  "version": "1.0.0",
+  "min_sdk_version": "0.0.16",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Kobler til hjelpeappen G2 Meldinger som kjører lokalt på telefonen, for å hente meldinger og sende svar.",
+      "whitelist": ["http://127.0.0.1:8765"]
+    }
+  ],
+  "supported_languages": ["en"]
+}
