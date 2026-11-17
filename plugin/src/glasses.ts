@@ -206,9 +206,12 @@ export class GlassesUI {
     const c = this.find(id)
     await this.showStatus(`Sender til ${c?.title ?? 'mottaker'} …`, false)
     const res = await this.api.reply(id, text)
-    if (res.ok) {
+    if (res.ok && res.verified) {
       this.state.conversations = this.state.conversations.filter((x) => x.id !== id)
       await this.showStatus(`● Sendt\n\n«${text}»`, true)
+    } else if (res.ok) {
+      this.state.conversations = this.state.conversations.filter((x) => x.id !== id)
+      await this.showStatus(`○ Ikke bekreftet\n${c?.appLabel ?? 'Appen'} bekreftet ikke svaret.\nSjekk på telefonen.\n\nTrykk for å gå tilbake`, false)
     } else {
       await this.showStatus(`○ Ikke sendt\n${res.error}\n\nTrykk for å gå tilbake`, false)
     }

@@ -26,7 +26,7 @@ export interface BridgeState {
   quickReplies: string[]
 }
 
-export type ReplyResult = { ok: true } | { ok: false; error: string }
+export type ReplyResult = { ok: true; verified: boolean } | { ok: false; error: string }
 
 export class BridgeClient {
   private token: string
@@ -59,7 +59,7 @@ export class BridgeClient {
       )
       if (res.status === 401) return { ok: false, error: 'Feil paringskode' }
       const body = await res.json().catch(() => ({}))
-      if (res.ok && body.ok) return { ok: true }
+      if (res.ok && body.ok) return { ok: true, verified: body.verified !== false }
       return { ok: false, error: body.error || `HTTP ${res.status}` }
     } catch {
       return { ok: false, error: 'Fant ikke hjelpeappen' }

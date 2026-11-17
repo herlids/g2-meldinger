@@ -89,7 +89,7 @@ class MessageListener : NotificationListenerService() {
             ?: extras.getCharSequence(Notification.EXTRA_TITLE))?.toString()?.trim().orEmpty()
             .ifEmpty { messages.last().sender.ifEmpty { app.label } }
 
-        val reply = findReplyAction(n)
+        val reply = findReplyAction(n, sbn.packageName)
         Store.recordStat(app, reply != null)
 
         // Siste melding er fra meg (appen oppdaterte varselet etter at jeg svarte) → ikke ulest lenger.
@@ -178,10 +178,12 @@ class MessageListener : NotificationListenerService() {
         return listOf(ChatLine(title.ifEmpty { "?" }, text, System.currentTimeMillis()))
     }
 
-    private fun findReplyAction(n: Notification): Notification.Action? {
-        // Noen apper (bl.a. Gmail) legger svar-knappen bare i Wear OS-delen av varselet.
+    private fun findReplyAction(n: Notification, pkg: String): Notification.Action? {
+        // Noen apper legger svar-knappen bare i Wear OS-delen av varselet.
+        // Gmail sin Wear-knapp ser ut til å bare virke fra en ekte klokke, så den hoppes over.
         @Suppress("DEPRECATION")
-        val wear = runCatching { Notification.WearableExtender(n).actions }.getOrNull().orEmpty()
+        val wear = if (pkg in WEAR_BROKEN) emptyList()
+            else runCatching { Notification.WearableExtender(n).actions }.getOrNull().orEmpty()
         val actions = (n.actions?.toList() ?: emptyList()) + wear
         val withInput = actions.filter { a ->
             a.remoteInputs?.any { it.allowFreeFormInput } == true
@@ -210,6 +212,9 @@ class MessageListener : NotificationListenerService() {
             RemoteInput.addResultsToIntent(inputs, intent, results)
             if (Build.VERSION.SDK_INT >= 28) RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_FREE_FORM_INPUT)
 
+            val key = conv.notificationKey
+            val before = key?.let { k -> runCatching { activeNotifications?.firstOrNull { it.key == k }?.postTime }.getOrNull() }
+
             if (Build.VERSION.SDK_INT >= 34) {
                 val opts = ActivityOptions.makeBasic()
                     .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
@@ -217,12 +222,27 @@ class MessageListener : NotificationListenerService() {
             } else {
                 action.actionIntent.send(this, 0, intent)
             }
+
+            // Appen bekrefter et svar ved å fjerne eller oppdatere varselet. Vent opptil 6 sek.
+            val verified = key == null || waitForAck(key, before)
             Store.remove(id)
-            LocalServer.Result(true)
+            if (!verified) Log.w(TAG, "${conv.app.label} bekreftet ikke svaret")
+            LocalServer.Result(true, verified = verified)
         } catch (e: Exception) {
             Log.e(TAG, "Svar feilet", e)
             LocalServer.Result(false, "Kunne ikke sende: ${e.javaClass.simpleName}")
         }
+    }
+
+    private fun waitForAck(key: String, postTimeBefore: Long?): Boolean {
+        val deadline = System.currentTimeMillis() + 6000
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(300)
+            val now = runCatching { activeNotifications?.firstOrNull { it.key == key } }.getOrNull()
+            if (now == null) return true                                   // varselet er borte
+            if (postTimeBefore != null && now.postTime != postTimeBefore) return true // oppdatert med svaret
+        }
+        return false
     }
 
     // ---------- AI-forslag ----------
@@ -264,6 +284,7 @@ class MessageListener : NotificationListenerService() {
 
     companion object {
         private const val TAG = "G2Listener"
+        private val WEAR_BROKEN = setOf("com.google.android.gm")
         @Volatile var instance: MessageListener? = null
     }
 }

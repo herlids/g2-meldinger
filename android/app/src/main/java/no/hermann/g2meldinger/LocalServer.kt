@@ -24,7 +24,7 @@ class LocalServer(
     private val onDismiss: (id: String) -> Unit,
     private val onRefreshAi: (id: String) -> Unit,
 ) {
-    data class Result(val ok: Boolean, val error: String? = null)
+    data class Result(val ok: Boolean, val error: String? = null, val verified: Boolean = true)
 
     private var socket: ServerSocket? = null
     private val pool = Executors.newFixedThreadPool(4)
@@ -117,7 +117,7 @@ class LocalServer(
                 val text = data.optString("text").trim()
                 if (id.isEmpty() || text.isEmpty()) return 400 to err("Mangler id eller tekst")
                 val r = onReply(id, text)
-                (if (r.ok) 200 else 409) to JSONObject().put("ok", r.ok).put("error", r.error ?: "").toString()
+                (if (r.ok) 200 else 409) to JSONObject().put("ok", r.ok).put("verified", r.verified).put("error", r.error ?: "").toString()
             }
             "POST /api/dismiss" -> {
                 onDismiss(data.optString("id"))
