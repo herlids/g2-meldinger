@@ -9,6 +9,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
 import android.service.notification.NotificationListenerService
+import android.service.notification.NotificationListenerService.Ranking
+import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import java.util.concurrent.Executors
@@ -105,10 +107,45 @@ class MessageListener : NotificationListenerService() {
         conv.messages = messages
         conv.replyAction = reply
         conv.notificationKey = sbn.key
+        conv.systemReplies = systemReplies(sbn, reply)
         if (changed) conv.updatedAt = maxOf(sbn.postTime, messages.last().ts)
         Store.upsert(conv)
 
         if (changed) requestAi(conv, force = false)
+    }
+
+    /** Androids egne svarforslag: fra systemet (Smart Reply) og fra appens egne valg i svarfeltet. */
+    private fun systemReplies(sbn: StatusBarNotification, reply: Notification.Action?, map: RankingMap? = null): List<String> {
+        val out = LinkedHashSet<String>()
+        runCatching {
+            val ranking = Ranking()
+            if ((map ?: currentRanking)?.getRanking(sbn.key, ranking) == true) {
+                ranking.smartReplies?.forEach { out.add(it.toString().trim()) }
+            }
+        }
+        reply?.remoteInputs?.forEach { ri -> ri.choices?.forEach { out.add(it.toString().trim()) } }
+        return out.filter { it.isNotEmpty() }.take(3)
+    }
+
+    override fun onNotificationRankingUpdate(rankingMap: RankingMap) {
+        super.onNotificationRankingUpdate(rankingMap)
+        // Systemets forslag kommer ofte litt etter selve varselet.
+        val active = runCatching { activeNotifications }.getOrNull() ?: return
+        for (sbn in active) {
+            if (Apps.forPackage(sbn.packageName) == null) continue
+            val conv = Store.findByNotificationKey(sbn.key) ?: continue
+            val replies = systemReplies(sbn, conv.replyAction, rankingMap)
+            if (replies != conv.systemReplies) {
+                conv.systemReplies = replies
+                if (prefs.aiProvider == "android" || conv.aiStatus == "error") applySystemReplies(conv)
+                Store.bump()
+            }
+        }
+    }
+
+    private fun applySystemReplies(conv: Conversation) {
+        conv.ai = conv.systemReplies
+        conv.aiStatus = if (conv.ai.isEmpty()) "off" else "ready"
     }
 
     private fun readMessages(extras: Bundle): List<ChatLine> {
@@ -191,9 +228,17 @@ class MessageListener : NotificationListenerService() {
     // ---------- AI-forslag ----------
 
     private fun requestAi(conv: Conversation, force: Boolean) {
-        val key = prefs.apiKey
-        if (!prefs.aiEnabled || key.isBlank() || !conv.canReply || conv.id == Store.TEST_ID) {
+        if (!prefs.aiEnabled || !conv.canReply || conv.id == Store.TEST_ID) {
             conv.aiStatus = "off"; conv.ai = emptyList(); Store.bump(); return
+        }
+        val provider = prefs.aiProvider
+        val key = when (provider) {
+            "gemini" -> prefs.geminiKey
+            "claude" -> prefs.apiKey
+            else -> ""
+        }
+        if (provider == "android" || key.isBlank()) {
+            applySystemReplies(conv); Store.bump(); return
         }
         val sig = conv.signature
         if (!force && conv.aiFor == sig && conv.aiStatus == "ready") return
@@ -203,14 +248,15 @@ class MessageListener : NotificationListenerService() {
         Store.bump()
         aiPool.execute {
             try {
-                val list = AiClient.suggest(key, conv)
+                val list = if (provider == "gemini") GeminiClient.suggest(key, conv) else AiClient.suggest(key, conv)
                 if (conv.aiFor == sig) {
-                    conv.ai = list
-                    conv.aiStatus = if (list.isEmpty()) "error" else "ready"
+                    if (list.isEmpty()) applySystemReplies(conv) else { conv.ai = list; conv.aiStatus = "ready" }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "AI feilet: ${e.message}")
-                if (conv.aiFor == sig) conv.aiStatus = "error"
+                Store.lastAiError = "${if (provider == "gemini") "Gemini" else "Claude"}: ${e.message?.take(120)}"
+                // Fall tilbake på Androids egne forslag.
+                if (conv.aiFor == sig) applySystemReplies(conv)
             }
             Store.bump()
         }

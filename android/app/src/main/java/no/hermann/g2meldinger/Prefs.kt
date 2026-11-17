@@ -28,6 +28,15 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_API, "") ?: ""
         set(v) = sp.edit().putString(KEY_API, v.trim()).apply()
 
+    /** "android" (lokalt, gratis), "gemini" (gratisnivå) eller "claude" (betalt API). */
+    var aiProvider: String
+        get() = sp.getString(KEY_PROVIDER, null) ?: if (apiKey.isNotBlank()) "claude" else "android"
+        set(v) = sp.edit().putString(KEY_PROVIDER, v).apply()
+
+    var geminiKey: String
+        get() = sp.getString(KEY_GEMINI, "") ?: ""
+        set(v) = sp.edit().putString(KEY_GEMINI, v.trim()).apply()
+
     var aiEnabled: Boolean
         get() = sp.getBoolean(KEY_AI, true)
         set(v) = sp.edit().putBoolean(KEY_AI, v).apply()
@@ -40,6 +49,8 @@ class Prefs(context: Context) {
         private const val KEY_QUICK = "quick"
         private const val KEY_API = "api_key"
         private const val KEY_AI = "ai"
+        private const val KEY_PROVIDER = "ai_provider"
+        private const val KEY_GEMINI = "gemini_key"
         const val DEFAULT_QUICK = "Ok 👍\nPå vei!\nRinger deg snart\nKan ikke snakke nå\nTakk!\nSvarer deg senere"
     }
 }

@@ -18,6 +18,7 @@ class Conversation(
     var ai: List<String> = emptyList()
     var aiStatus: String = "off"   // off | pending | ready | error
     var aiFor: String = ""         // signatur av meldingen forslagene gjelder
+    var systemReplies: List<String> = emptyList() // Androids egne svarforslag (lokalt, gratis)
 
     val canReply get() = replyAction != null || id == Store.TEST_ID
     val signature get() = messages.lastOrNull()?.let { "${it.ts}|${it.text}" } ?: ""
@@ -50,6 +51,7 @@ object Store {
     val stats = HashMap<String, AppStat>()
     @Volatile var rev = 0L; private set
     @Volatile var lastTestReply: String? = null
+    @Volatile var lastAiError: String? = null
     var onChange: (() -> Unit)? = null
 
     @Synchronized fun get(id: String) = conversations[id]
@@ -72,6 +74,8 @@ object Store {
     }
 
     @Synchronized fun count() = conversations.size
+
+    @Synchronized fun findByNotificationKey(key: String) = conversations.values.firstOrNull { it.notificationKey == key }
 
     @Synchronized fun recordStat(app: AppDef, hasReply: Boolean) {
         val s = stats.getOrPut(app.key) { AppStat() }

@@ -11,6 +11,11 @@ object AiClient {
     private const val URL_MESSAGES = "https://api.anthropic.com/v1/messages"
 
     fun suggest(apiKey: String, c: Conversation): List<String> {
+        val prompt = buildPrompt(c)
+        return callClaude(apiKey, prompt)
+    }
+
+    internal fun buildPrompt(c: Conversation): String {
         val thread = c.messages.takeLast(8).joinToString("\n") { m ->
             val who = if (m.sender.isBlank()) "Meg" else m.sender
             "$who: ${m.text}"
@@ -26,6 +31,10 @@ object AiClient {
             - Gi gjerne ett ja-aktig, ett nei/utsett-aktig og ett spørsmål eller nøytralt svar når det passer.
             Svar KUN med en JSON-liste med tre strenger, f.eks. ["…","…","…"].
         """.trimIndent()
+        return prompt
+    }
+
+    private fun callClaude(apiKey: String, prompt: String): List<String> {
 
         val body = JSONObject()
             .put("model", MODEL)

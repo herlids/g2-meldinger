@@ -20,6 +20,8 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
@@ -115,24 +117,54 @@ class MainActivity : Activity() {
         })
 
         // AI
-        val ai = card("AI-FORSLAG (CLAUDE)")
-        val aiSwitch = Switch(this).apply {
-            text = "Lag 3 svarforslag til hver ny melding"
+        val ai = card("AI-FORSLAG")
+        ai.addView(Switch(this).apply {
+            text = "Vis 3 svarforslag (★) til hver ny melding"
             isChecked = prefs.aiEnabled
             setOnCheckedChangeListener { _, on -> prefs.aiEnabled = on }
-        }
-        ai.addView(aiSwitch)
-        ai.addView(body("Meldingsteksten sendes til Anthropic for å lage forslagene. Nøkkel fra console.anthropic.com.", dim = true))
-        val keyEdit = EditText(this).apply {
-            hint = "sk-ant-…"
-            setText(prefs.apiKey)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        }
-        ai.addView(keyEdit)
-        ai.addView(button("Lagre nøkkel") {
-            prefs.apiKey = keyEdit.text.toString()
-            toast(if (prefs.apiKey.isBlank()) "Nøkkel fjernet" else "Nøkkel lagret")
         })
+
+        val providers = listOf(
+            Triple("android", "Android (gratis, på telefonen)",
+                "Telefonens egne svarforslag. Ingenting sendes ut. Krever «Foreslåtte handlinger og svar» på i Innstillinger → Varsler. Enklere forslag."),
+            Triple("gemini", "Google Gemini (gratis)",
+                "Smarte forslag gratis. Nøkkel fra aistudio.google.com. NB: Google bruker data fra gratisnivået til å forbedre produktene sine – meldingene kan altså leses av Google."),
+            Triple("claude", "Claude (betalt API)",
+                "Beste forslag. Krever kreditt på platform.claude.com – Pro-abonnementet dekker ikke dette."),
+        )
+        val providerInfo = body("", dim = true)
+        val geminiEdit = keyField("Gemini-nøkkel (AIza…)", prefs.geminiKey)
+        val claudeEdit = keyField("Claude-nøkkel (sk-ant-…)", prefs.apiKey)
+        fun showFor(p: String) {
+            providerInfo.text = providers.first { it.first == p }.third
+            geminiEdit.visibility = if (p == "gemini") View.VISIBLE else View.GONE
+            claudeEdit.visibility = if (p == "claude") View.VISIBLE else View.GONE
+        }
+        val group = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+        providers.forEachIndexed { i, (key, label, _) ->
+            group.addView(RadioButton(this).apply {
+                id = 1000 + i
+                text = label
+                isChecked = prefs.aiProvider == key
+                setPadding(0, px(4), 0, px(4))
+            })
+        }
+        group.setOnCheckedChangeListener { _, checkedId ->
+            val key = providers[checkedId - 1000].first
+            prefs.aiProvider = key
+            showFor(key)
+        }
+        ai.addView(group)
+        ai.addView(providerInfo)
+        ai.addView(geminiEdit)
+        ai.addView(claudeEdit)
+        ai.addView(button("Lagre nøkkel") {
+            prefs.geminiKey = geminiEdit.text.toString()
+            prefs.apiKey = claudeEdit.text.toString()
+            Store.lastAiError = null
+            toast("Lagret")
+        })
+        showFor(prefs.aiProvider)
 
         // Apper
         val apps = card("APPER")
@@ -167,6 +199,7 @@ class MainActivity : Activity() {
             append(if (battery) "● Batterioptimalisering av\n" else "○ Batterioptimalisering på – Samsung kan stoppe appen\n")
             append("Uleste samtaler: ${Store.count()}")
             Store.lastTestReply?.let { append("\nSiste testsvar fra brillene: «$it»") }
+            Store.lastAiError?.let { append("\n○ AI-feil (bruker Androids forslag i stedet): $it") }
         }
         accessButton.text = if (access) "Varseltilgang (innstillinger)" else "Gi varseltilgang"
         batteryButton.visibility = if (battery) View.GONE else View.VISIBLE
@@ -237,6 +270,12 @@ class MainActivity : Activity() {
         })
         root.addView(c, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(16) })
         return c
+    }
+
+    private fun keyField(hintText: String, value: String) = EditText(this).apply {
+        hint = hintText
+        setText(value)
+        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
     }
 
     private fun button(t: String, onClick: () -> Unit) = Button(this).apply {

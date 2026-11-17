@@ -1,7 +1,7 @@
 # G2 Meldinger
 
 Les og svar på **SMS, Messenger, Snapchat og Gmail** fra Even Realities G2 med R1-ringen.
-Hver melding får tre AI-forslag fra Claude (★) og dine egne standardsvar.
+Hver melding får tre AI-forslag (★) og dine egne standardsvar. Forslagene kan lages av Android på telefonen (gratis), Google Gemini (gratis) eller Claude (betalt API).
 
 ```
 Varsel på telefonen ──► Hjelpeappen (Android) ──► 127.0.0.1:8765 ──► G2-appen (Even Hub) ──► brillene
