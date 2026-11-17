@@ -15,13 +15,14 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: "1.0.0"
     }
 
-    // Fast signeringsnøkkel slik at Obtainium kan oppdatere appen. Ligger i et privat repo.
+    // Fast signeringsnøkkel slik at Obtainium kan oppdatere appen.
+    // Nøkkelen ligger kryptert i repoet og dekrypteres i GitHub Actions med KEYSTORE_PASSWORD (Secrets).
     signingConfigs {
         create("release") {
             storeFile = file("../signing/g2meldinger.jks")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "DJZFL8D1CJLFfeGAIJgKreXD"
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
             keyAlias = "g2meldinger"
-            keyPassword = System.getenv("KEYSTORE_PASSWORD") ?: "DJZFL8D1CJLFfeGAIJgKreXD"
+            keyPassword = System.getenv("KEYSTORE_PASSWORD")
         }
     }
 

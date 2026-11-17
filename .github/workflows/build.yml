@@ -27,8 +27,21 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Dekrypter signeringsnøkkel
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Mangler KEYSTORE_PASSWORD under Settings → Secrets and variables → Actions"; exit 1
+          fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+            -in android/signing/g2meldinger.jks.enc -out android/signing/g2meldinger.jks \
+            -pass env:KEYSTORE_PASSWORD
+
       - name: Bygg APK
         working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Gi APK-en et fast navn

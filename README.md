@@ -32,7 +32,7 @@ Samtalelisten: ★ AI-forslag → standardsvar → ▶ Les hele samtalen → ■
 
 ### 1. Hjelpeappen (Obtainium)
 1. GitHub Actions bygger en signert APK ved hver push til `main` og legger den ut som release.
-2. I Obtainium: **Legg til app** → lim inn adressen til repoet. Obtainium trenger et GitHub-token i innstillingene for å lese private repoer.
+2. I Obtainium: **Legg til app** → `https://github.com/herlids/g2-meldinger`. Repoet er offentlig, så du trenger ikke token.
 3. Åpne **G2 Meldinger** og gjør følgende:
    - **Gi varseltilgang** (Innstillinger → Varseltilgang → G2 Meldinger)
    - **Slå av batterioptimalisering**, ellers kan Samsung stoppe appen i bakgrunnen
@@ -65,7 +65,7 @@ Hjelpeappen viser under **Apper** om varslene fra hver app har svarknapp:
 ## Personvern og sikkerhet
 - Serveren lytter bare på `127.0.0.1`, så andre enheter på nettet når den ikke. Alle kall krever paringskoden, slik at nettsider på telefonen ikke kan lese meldingene.
 - Med AI på sendes de siste meldingene i samtalen til Anthropic for å lage forslag. Slå det av i hjelpeappen om du ikke vil det.
-- Signeringsnøkkelen ligger i `android/signing/`, slik at Obtainium kan oppdatere appen. **Hold repoet privat.**
+- Signeringsnøkkelen ligger **kryptert** i `android/signing/` og dekrypteres i GitHub Actions med hemmeligheten `KEYSTORE_PASSWORD`. Repoet kan derfor være offentlig.
 
 ## Utvikling
 ```bash
